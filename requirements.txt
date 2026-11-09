@@ -1,0 +1,10 @@
+# Pinned to the versions verified on Arch / Python 3.14.
+# requirements.lock.txt contains the full transitive set.
+faster-whisper==1.2.1
+numpy==2.5.4
+openai==3.46.0
+piper-tts==1.8.0
+pynput==1.8.2
+python-dotenv==1.2.4
+sounddevice==0.5.6
+pytest==9.2.0

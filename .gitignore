@@ -1,0 +1,25 @@
+# Local environment / secrets
+.env
+.venv/
+venv/
+
+# Models are large; download them with scripts/download_voice.py
+models/*.onnx
+models/*.onnx.json
+models/*.json
+
+# Runtime data
+logs/*
+!logs/.gitkeep
+workspace/*
+!workspace/.gitkeep
+
+# Python / test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS noise
+.DS_Store
