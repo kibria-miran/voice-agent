@@ -74,10 +74,15 @@ $EDITOR .env          # set NVIDIA_API_KEY
 ```
 
 Get a key from <https://build.nvidia.com/>. Keep `NIM_MODEL` configurable:
-tool-calling quality varies by model. The startup self-test sends a dummy tool
-request and warns if the model answers in plain text instead of calling a tool.
-If it warns, pick another tool-capable model from the catalog and update
-`.env`.
+tool-calling quality varies by model, and not every catalog entry is provisioned
+for every account. The startup self-test sends a dummy tool request with a
+short timeout (20 s, no retries) and warns if the model answers in plain text or
+does not respond at all. If it warns, pick another tool-capable model from the
+catalog and update `.env`.
+
+The default, `nvidia/nemotron-3.5-lightning-30b-a3b`, was verified on
+2026-11-10: it called `get_time` in about 2.5 s, completed a file-writing agent
+turn in about 3 s, and answered a plain question in under 1 s.
 
 Quick raw check:
 
@@ -85,7 +90,7 @@ Quick raw check:
 curl https://integrate.api.nvidia.com/v1/chat/completions \
   -H "Authorization: Bearer $NVIDIA_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"meta/llama-3.1-8b-instruct","messages":[{"role":"user","content":"hi"}],"max_tokens":20}'
+  -d '{"model":"nvidia/nemotron-3.5-lightning-30b-a3b","messages":[{"role":"user","content":"hi"}],"max_tokens":20}'
 ```
 
 ### 4. Piper voice
@@ -177,11 +182,13 @@ significant swap), so treat these as upper bounds:
 
 | Stage | Observed |
 | --- | --- |
-| Whisper tiny.en load | ~6 s once |
+| Whisper tiny.en load | ~6-16 s once (load-dependent) |
 | Whisper tiny.en, 2.4 s clip | ~3.5 s |
-| Piper voice load | ~6-10 s once |
-| Piper synth, ~2.5 s audio | ~1.6 s |
-| Provider RSS after both models | ~430 MB |
+| Piper voice load | ~6-12 s once (longer under heavy load) |
+| Piper synth, ~2.5 s audio | ~1.6 s under load; roughly 1x real-time when idle |
+| Provider RSS after both models | ~370 MB measured peak |
+| NIM tool-call round trip (verified model) | ~2.5 s |
+| NIM plain answer (verified model) | ~0.9 s |
 
 On an idle machine and with a warm NIM connection, the plan's 3-6 s release
 to first word is realistic. If it is not, check `logs/turns.jsonl` before
@@ -225,7 +232,9 @@ Everything tunable is in `src/config.py`, with environment overrides:
 | --- | --- | --- |
 | `NVIDIA_API_KEY` | — | required |
 | `NIM_BASE_URL` | `https://integrate.api.nvidia.com/v1` | API endpoint |
-| `NIM_MODEL` | `meta/llama-3.1-8b-instruct` | must pass the tool self-test |
+| `NIM_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` | must pass the tool self-test |
+| `LLM_TIMEOUT_S` | `30` | per-request timeout for normal turns |
+| `LLM_SELF_TEST_TIMEOUT_S` | `20` | startup check timeout; one attempt, fail-soft |
 | `WHISPER_MODEL` | `tiny.en` | try `base.en` if accuracy is poor |
 | `WHISPER_CPU_THREADS` | `2` | CTranslate2 worker threads |
 | `PTT_KEY` | `f9` | pynput key name |

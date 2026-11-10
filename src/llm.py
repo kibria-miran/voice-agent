@@ -37,25 +37,32 @@ def _retryable(exc: Exception) -> bool:
     return False
 
 
-def chat(messages, tools=None):
-    """Send one non-streaming chat completion and return the assistant message."""
+def chat(messages, tools=None, timeout=None, retries=None):
+    """Send one non-streaming chat completion and return the assistant message.
+
+    ``timeout`` and ``retries`` default to the tunable values in config; the
+    startup self-test passes a short timeout and no retries.
+    """
+    timeout = config.LLM_TIMEOUT_S if timeout is None else timeout
+    retries = config.LLM_RETRIES if retries is None else retries
     kwargs = dict(
         model=config.NIM_MODEL,
         messages=messages,
         temperature=0.3,
         max_tokens=config.MAX_TOKENS,
+        timeout=timeout,
     )
     if tools:
         kwargs.update(tools=tools, tool_choice="auto")
 
     last_exc = None
-    for attempt in range(config.LLM_RETRIES + 1):
+    for attempt in range(retries + 1):
         try:
             response = _get_client().chat.completions.create(**kwargs)
             return response.choices[0].message
         except Exception as exc:  # noqa: BLE001 - re-raised below
             last_exc = exc
-            if attempt >= config.LLM_RETRIES or not _retryable(exc):
+            if attempt >= retries or not _retryable(exc):
                 raise
             time.sleep(config.LLM_RETRY_BASE_S * (2**attempt))
     raise last_exc  # pragma: no cover - loop always returns or raises
@@ -93,6 +100,8 @@ def self_test_tools(schemas):
         msg = chat(
             [{"role": "user", "content": "What time is it? Use a tool."}],
             schemas,
+            timeout=config.LLM_SELF_TEST_TIMEOUT_S,
+            retries=0,
         )
         if not getattr(msg, "tool_calls", None):
             print(

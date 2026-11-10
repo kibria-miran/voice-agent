@@ -143,6 +143,7 @@ FIND_FORBIDDEN = {
     "-delete",
     "-fprint",
     "-fprint0",
+    "-fprintf",
     "-fls",
 }
 SAFE_GIT_FORMS = (
@@ -150,7 +151,7 @@ SAFE_GIT_FORMS = (
     ("git", "--no-pager", "diff", "--stat", "--no-ext-diff"),
     ("git", "--no-pager", "log", "--oneline", "-20"),
 )
-PRIVILEGE_COMMANDS = {"sudo", "su", "doas", "pkexec"}
+PRIVILEGE_COMMANDS = {"sudo", "sudoedit", "su", "doas", "pkexec", "run0"}
 
 
 def _has_unquoted_meta(cmd: str) -> bool:
@@ -180,24 +181,32 @@ def _has_unquoted_meta(cmd: str) -> bool:
 
 
 def _outside_arg(argv) -> str | None:
-    """Return the first non-flag argument that resolves outside WORKSPACE."""
+    """Return the first argument that resolves outside WORKSPACE.
+
+    Both bare arguments and the value half of ``--option=value`` are checked,
+    so ``grep --file=/etc/passwd ...`` cannot read outside without a prompt.
+    """
     workspace = Path(config.WORKSPACE).resolve()
     for token in argv[1:]:
-        if not token or token.startswith("-"):
+        if not token:
             continue
-        if len(token) > 500:
-            continue
-        try:
-            candidate = Path(token)
-            full = (
-                candidate.resolve()
-                if candidate.is_absolute()
-                else (workspace / candidate).resolve()
-            )
-        except (OSError, ValueError):
-            continue
-        if full != workspace and workspace not in full.parents:
-            return token
+        candidates = [token]
+        if "=" in token:
+            value = token.split("=", 1)[1]
+            if value:
+                candidates.append(value)
+        for candidate in candidates:
+            try:
+                path = Path(candidate)
+                full = (
+                    path.resolve()
+                    if path.is_absolute()
+                    else (workspace / path).resolve()
+                )
+            except (OSError, ValueError):
+                continue
+            if full != workspace and workspace not in full.parents:
+                return candidate
     return None
 
 
@@ -260,7 +269,7 @@ def run_command(cmd: str) -> str:
         return f"ERROR: could not parse command: {exc}"
     if not argv:
         return "ERROR: empty command"
-    if argv[0] in PRIVILEGE_COMMANDS:
+    if Path(argv[0]).name in PRIVILEGE_COMMANDS:
         return "ERROR: sudo/su/doas/pkexec are refused"
 
     if argv[0] == "find":

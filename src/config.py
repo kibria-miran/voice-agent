@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 NIM_BASE_URL = os.getenv("NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
 # Must pass llm.self_test_tools(); override in .env when it does not.
-NIM_MODEL = os.getenv("NIM_MODEL", "meta/llama-3.1-8b-instruct")
+NIM_MODEL = os.getenv("NIM_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
 
 SAMPLE_RATE = 16000
 PTT_KEY = os.getenv("PTT_KEY", "f9")  # hold to talk
@@ -80,6 +80,10 @@ COMMAND_TIMEOUT_S = 20
 NOTES_MAX_CHARS = 2000
 LLM_RETRIES = 2
 LLM_RETRY_BASE_S = 0.75
+LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "30"))
+# The startup check must fail soft long before a voice turn would: a
+# misprovisioned model can hang the connection instead of returning an error.
+LLM_SELF_TEST_TIMEOUT_S = float(os.getenv("LLM_SELF_TEST_TIMEOUT_S", "20"))
 DEBUG = os.getenv("DEBUG") == "1"
 
 SYSTEM_PROMPT = (

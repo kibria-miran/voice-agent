@@ -134,6 +134,7 @@ def test_quoted_semicolons_are_allowed_in_exec_commands(workspace, monkeypatch):
 def test_sudo_refused_without_prompt(workspace, monkeypatch):
     monkeypatch.setattr(tools, "_confirm", lambda argv: (_ for _ in ()).throw(AssertionError))
     assert tools.run_command("sudo ls").startswith("ERROR: sudo")
+    assert tools.run_command("/usr/bin/sudo ls").startswith("ERROR: sudo")
 
 
 def test_safe_git_form_does_not_prompt(workspace, monkeypatch):
@@ -212,6 +213,25 @@ def test_timeout_kills_the_process_group(workspace, monkeypatch):
 def test_find_rejects_exec(workspace, monkeypatch):
     monkeypatch.setattr(tools, "_confirm", lambda argv: (_ for _ in ()).throw(AssertionError))
     assert "not allowed" in tools.run_command("find . -exec rm {} +")
+
+
+def test_find_rejects_file_writing_actions(workspace, monkeypatch):
+    monkeypatch.setattr(tools, "_confirm", lambda argv: (_ for _ in ()).throw(AssertionError))
+    assert "not allowed" in tools.run_command("find . -fprintf out.txt %p")
+    assert "not allowed" in tools.run_command("find . -fprint out.txt")
+
+
+def test_option_value_outside_workspace_asks(workspace, monkeypatch):
+    called = []
+    monkeypatch.setattr(tools, "_confirm", lambda argv: called.append(argv) or False)
+    out = tools.run_command("grep --file=/etc/passwd .")
+    assert called and out.startswith("ERROR: command refused")
+
+
+def test_option_value_inside_workspace_does_not_ask(workspace, monkeypatch):
+    monkeypatch.setattr(tools, "_confirm", lambda argv: (_ for _ in ()).throw(AssertionError))
+    out = tools.run_command("grep --exclude=*.py -r x .")
+    assert not out.startswith("ERROR: command refused")
 
 
 # ---------------------------------------------------------------------------

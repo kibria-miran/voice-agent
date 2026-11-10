@@ -6,7 +6,7 @@ from src import config, llm
 
 
 def test_self_test_tools_warns_instead_of_raising(monkeypatch, capsys):
-    def boom(messages, schemas):
+    def boom(messages, schemas, **kwargs):
         raise RuntimeError("401 unauthorized")
 
     monkeypatch.setattr(llm, "chat", boom)
@@ -18,9 +18,25 @@ def test_self_test_tools_warns_when_model_does_not_call_a_tool(monkeypatch, caps
     class Msg:
         content = "It is noon."
 
-    monkeypatch.setattr(llm, "chat", lambda messages, schemas: Msg())
+    monkeypatch.setattr(llm, "chat", lambda messages, schemas, **kwargs: Msg())
     llm.self_test_tools([])
     assert "did not call a tool" in capsys.readouterr().out
+
+
+def test_self_test_uses_short_timeout_and_no_retries(monkeypatch):
+    captured = {}
+
+    class Msg:
+        tool_calls = [object()]
+
+    def fake_chat(messages, schemas, **kwargs):
+        captured.update(kwargs)
+        return Msg()
+
+    monkeypatch.setattr(llm, "chat", fake_chat)
+    llm.self_test_tools([])
+    assert captured["timeout"] == config.LLM_SELF_TEST_TIMEOUT_S
+    assert captured["retries"] == 0
 
 
 def test_missing_api_key_raises_runtime_error(monkeypatch):
